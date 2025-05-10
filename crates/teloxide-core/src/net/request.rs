@@ -50,7 +50,6 @@ where
     process_response(response).await
 }
 
-#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, fields(method_name = %method_name)))]
 pub async fn request_json<T>(
     client: &Client,
     token: &str,
@@ -62,6 +61,16 @@ pub async fn request_json<T>(
 where
     T: DeserializeOwned + 'static,
 {
+    #[cfg(feature = "tracing")]
+    {
+        use tracing::{span, Level, Span};
+
+        let _fspan;
+        if Span::current().metadata().is_some() {
+            _fspan = span!(Level::INFO, "request_json", method_name).entered();
+        };
+    }
+
     // Workaround for [#460]
     //
     // Telegram has some methods that return either `Message` or `True` depending on
@@ -91,11 +100,20 @@ where
     process_response(response).await
 }
 
-#[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 async fn process_response<T>(response: Response) -> ResponseResult<T>
 where
     T: DeserializeOwned + 'static,
 {
+    #[cfg(feature = "tracing")]
+    {
+        use tracing::{span, Level, Span};
+
+        let _span;
+        if Span::current().metadata().is_some() {
+            _span = span!(Level::INFO, "process_response").entered();
+        };
+    }
+
     if response.status().is_server_error() {
         tokio::time::sleep(DELAY_ON_SERVER_ERROR).await;
     }
@@ -105,11 +123,20 @@ where
     deserialize_response(text)
 }
 
-#[cfg_attr(feature = "tracing", tracing::instrument(skip_all))]
 fn deserialize_response<T>(text: String) -> Result<T, RequestError>
 where
     T: DeserializeOwned + 'static,
 {
+    #[cfg(feature = "tracing")]
+    {
+        use tracing::{span, Level, Span};
+
+        let _span;
+        if Span::current().metadata().is_some() {
+            _span = span!(Level::INFO, "deserialize_response").entered();
+        };
+    }
+
     serde_json::from_str::<TelegramResponse<T>>(&text)
         .map(|mut response| {
             use crate::types::{Update, UpdateKind};
